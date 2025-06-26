@@ -1,0 +1,265 @@
+---
+title: "Aboveground biomass"
+author: "sumir Shrestha"
+date: "2025-01-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown for Aboveground Biomass
+In this example, we will use linear regression model to predict aboveground biomass using dbh and total tree height. the data is derive from paper which contain, foliage (fol), Branch (bch), stem bark (brk), stem wood (stm), and total aboveground biomass(tab) along with diameter at breast height (dbh), live crown length (lcl), and total tree height (tht).
+
+# Read data
+```{r}
+setwd("E://Training//AbovegroundBiomass")
+df <- read.csv("NayBormann.csv")
+```
+
+we will focus on total aboveground biomass in this example, first thing we would like to do qith data at hand is to look at a few observation, summary statistics, and create some exploratory figures. R function "head()" will print first six rows of the data whereas, function 'summary()' will provide basic statistics of all variables in the dataset.
+
+```{r}
+head(df)
+str(df)
+summary(df)
+
+```
+# plotting the data
+
+```{r}
+library(ggplot2)
+```
+
+Because we are intrested in developing a model that predicts. Total aboveground biomass 'tab' based on 'dbh' and 'tht'. our dependent variable is 'tab' and independent variables are 'dbh' and 'tht'. Therefore, on the scatterplot, we plot 'tab' on y-axis and 'dbh', and 'tht' on the x-axis.
+
+```{r}
+p1 = ggplot(data = df, aes(x=dbh, y=tab)) + geom_point() +
+  xlab("DBH(cm)") + ylab ("Total aboveground biomass (Kg)") +
+  theme_bw()
+p1
+
+p2 = ggplot(data = df, aes(x=tht, y=tab)) + geom_point() +
+  xlab("Total tree height (m)") + ylab ("Total aboveground biomass (Kg)") +
+  theme_bw()
+p2
+```
+Now I will use R function 'grid.arrange()' within the 'gridExtra' library to combine these two plots into one. By specifying, 'nrow=1', I am telling R that i want to to figure in one row.
+
+```{r}
+library(gridExtra)
+
+grid.arrange(p1, p2)
+grid.arrange(p1, p2, nrow=1)
+```
+The reason for creating scatterplot is to determine if a linear model will be appropriate. Additionally it can show us any unusal/ outlying observation in the dataset. Here, we see that the relationship of dbh and tht witht tab is not perfectly linear but approximately linear. we will move forward with a linear model. specifically, we will fit a multiple linear regression model that predicts tab (kg) as a function of dbh (cm) and tht (m).
+
+```{r}
+str(df)
+summary(df)
+```
+
+
+#Fit model
+
+we use R function 'lm()' to fit a linear regression. Following line of code uses the dataset named 'df' and fits a multiple linear regression for tab as a function of dbh and tht.
+```{r}
+mod1 = lm(tab ~ dbh + tht, data = df)
+```
+
+To see the results we use R function 'summary()' and include the name of the model inside the parenthesis as follows.
+
+```{r}
+summary(mod1)
+```
+Here, we get the regression coefficients and many more information. Intercept of the regression model is denoted as (Intercept) and slopes are denoted by the name of independent variables (dbh and tht in our case). The $R^2$ value is also printed as the output. The quantity *Residual standard error* is the square root of MSE (Mean Squared Error) which is sum of squared error divided by the degree of freedom for the error.
+
+# Fitted Values
+
+To get the fitted values for the modeling dataset we can use 'fitted()' function. Following code will create a new variable called 'tab_pred' using the fitted model. First five observations are then printed using 'head()' function and specifying 'n=5' within the 'head()' function.
+
+```{r}
+df$tab_pred = fitted(mod1)
+head(df, n=5)
+```
+# Residuals
+
+Residuals analysis is critical in developing regression models. Residuals are used to test model assumptions and to determine whether the model is appropriate for the given dataset. we can use 'resid()' or 'residuals()' function in R to get the residuals from the 'lm()' fit.
+
+```{r}
+r1 = ggplot() +
+  aes(fitted(mod1), residuals(mod1))+
+  geom_point()+
+  theme_bw()+
+  xlab("Fitted values") + ylab("Residuals") +
+  ggtitle("Residuals vs fitted plot") +
+  theme(plot.title = element_text(hjust = 0.5))
+r1
+```
+Ideally, we want the residuals to scatter around zero and not show any discernible pattern. Here we see a curvilinear trend in the residual. Residuals decrease for fitted values from zero to about 2000 kg and then they increase. This a common problem in the biomass data. Usually, this problem can be resolved using a logarithmic transformation on both dependent and independent variables.
+
+# Logarithmic model
+Let's fit a logarithmic model i.e., our model will predict 'ln(tab)' as a function of 'ln(dbh)' and 'ln(tht)'. First we will create new variables ln(dbh), ln(tht), and ln(tab) which are log transformations of dbh, tht, and tab, respectively. Then we will create scatterplot of these transformed variables and put in one figure.
+
+```{r}
+df$lndbh = log(df$dbh)
+df$lntht = log(df$tht)
+df$lntab = log(df$tab)
+
+p3 = ggplot(data = df, aes(x =lndbh, y =lntab)) + geom_point()+
+  theme_bw()
+
+p4 = ggplot(data = df, aes(x =lntht, y =lntab)) + geom_point()+
+  theme_bw()
+
+grid.arrange(p3, p4, nrow=1)
+```
+Now refit the model with log transformed data. We will still use the 'lm()' function, but use the log transformed variables in the model as below:
+
+```{r}
+mod2 = lm(lntab ~ lndbh + lntht, data = df)
+summary(mod2)
+```
+Let's extract the adjusted R-squared from both un-transformed and log-transformed model and compare them.
+
+```{r}
+summary(mod1)$adj.r.squared #un-transformed model
+summary(mod2)$adj.r.squared #log-transformed model
+```
+Adjusted R-squared is better for log-transformed model, but we are interested in looking at the residuals as well.
+
+# Plot residuals
+
+```{r}
+r2 = ggplot() +
+  aes(fitted(mod2), residuals(mod2)) +
+  geom_point() +
+  theme_bw() +
+  xlab("Fitted values") + ylab("Residuals") +
+  ggtitle("Residuals vs. fitted plot ~ transformed model") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+r2
+```
+
+It will be helpful to plot residuals from two models together for comparison. we can do that by using the same 'grid.arrange()' function.
+
+```{r}
+grid.arrange(r1, r2)
+```
+we see that the residual plot of log-transformed model looks better than the un-transformed model. However, we need to take note that this model predicts 'ln(tab)' instead of 'tab'. we can use 'exp()' function to back transform the predicted value to original unit. However, this model will have *transformation bias*. There are several bias correction factors suggested to alleviate this. One common correction is to multiply the back transformed value by $exp(MSE/2)$, where MSE is the mean squared error of the logarithmic model.
+
+# Component biomass vs. dbh 
+
+we will use linear regression model to predict aboveground biomass using dbh and tht with component biomass. The data contain, foliage (fol), Branch (bch), stem bark (brk), stem wood (stm), and total aboveground biomass(tab) along with diameter at breast height (dbh), live crown length (lcl), and total tree height (tht).
+
+since we are not interested in component biomass models, we will plot each component biomass vs. dbh and tht
+```{r}
+stm = ggplot(data = df, aes(x=dbh, y=stm)) + 
+  geom_point() +
+  xlab("DBH (cm)") + ylab("Stemwood biomass (kg)")+
+  theme_bw()
+
+brk = ggplot(data = df, aes(x=dbh, y=brk)) + 
+  geom_point() +
+  xlab("DBH (cm)") + ylab("Stembark biomass (kg)")+
+  theme_bw()
+
+bch = ggplot(data = df, aes(x=dbh, y=bch)) + 
+  geom_point() +
+  xlab("DBH (cm)") + ylab("Branchwood biomass (kg)")+
+  theme_bw()
+
+fol = ggplot(data = df, aes(x=dbh, y=fol)) + 
+  geom_point() +
+  xlab("DBH (cm)") + ylab("Foliage biomass (kg)")+
+  theme_bw()
+
+grid.arrange(stm, brk, bch, fol)
+```
+Now component biomass vs. total tree height
+
+```{r}
+stm = ggplot(data = df, aes(x=tht, y=stm)) + 
+  geom_point() +
+  xlab("Total tree height (m)") + ylab("Stemwood biomass (kg)")+
+  theme_bw()
+
+brk = ggplot(data = df, aes(x=tht, y=brk)) + 
+  geom_point() +
+  xlab("Total tree height (m)") + ylab("Stembark biomass (kg)")+
+  theme_bw()
+
+bch = ggplot(data = df, aes(x=tht, y=bch)) + 
+  geom_point() +
+  xlab("Total tree height (m)") + ylab("Branchwood biomass (kg)")+
+  theme_bw()
+
+fol = ggplot(data = df, aes(x=tht, y=fol)) + 
+  geom_point() +
+  xlab("Total tree height (m)") + ylab("Foliage biomass (kg)")+
+  theme_bw()
+
+grid.arrange(stm, brk, bch, fol)
+```
+# Logarithmic transformation
+
+```{r}
+df$lndbh = log(df$dbh)
+df$lntht = log(df$tht)
+df$lntab = log(df$tab)
+df$lnlcl = log(df$lcl)
+df$lnstm = log(df$stm)
+df$lnbrk = log(df$brk)
+df$lnbch = log(df$bch)
+df$lnfol = log(df$fol)
+ 
+```
+
+# Fit a system of linear equations
+
+There are two options when fitting component models. One is to fit them independently using ordinary least square (OLS) method and the second is to use seemingly unrelated regression (SUR). Since the data we use in component models come from same tree, it is common to use the SUR method which allows cross-equation correlation. In R, the SUR is available via 'systemfit()' package. Let's first define our component models and create our system of equations.
+
+I will also use 'dbh' and 'lcl' (length of live crown) as the predictors.
+
+```{r}
+library("systemfit")
+
+stm = lnstm ~ lndbh + lntht
+brk = lnbrk ~ lndbh + lntht
+bch = lnbch ~ lndbh + lntht
+fol = lnfol ~ lndbh + lnlcl
+system = list(Stemwood.Model = stm,
+              Stembark.Model = brk,
+              Branch.Model = bch,
+              Foliage.Model = fol)
+
+
+```
+Now, we can use 'systemfit()' function to fit. We can supply 'OLS' or 'SUR' options within 'systemfit()' to fit OLS or SUR model, respectively.
+
+# ordinary least square (OLS) fit.
+
+```{r}
+fitOLS = systemfit(system, "OLS", data =df)
+summary(fitOLS)
+```
+The parameter estimates from this fit will be same as if we fitted four separate models using 'lm()' function.
+See example for foliage model:
+
+```{r}
+fitfol = lm(lnfol ~ lndbh + lnlcl, data = df)
+summary(fitfol)
+```
+# seemingly unrelated regression (SUR) fit
+
+```{r}
+fitsur = systemfit(system, "SUR", data = df)
+summary(fitsur)
+```
+
+
+
+
+
